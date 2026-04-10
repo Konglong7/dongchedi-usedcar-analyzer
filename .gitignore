@@ -1,0 +1,20 @@
+# 调试文件
+*.png
+*.woff2
+char_*
+font_*
+ref_*
+digit_*
+test_*
+
+# 数据文件（通过爬虫生成）
+data.json
+data.js
+
+# Python
+__pycache__/
+*.pyc
+
+# 系统文件
+.DS_Store
+Thumbs.db

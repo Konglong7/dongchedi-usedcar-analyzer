@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>懂车帝二手车数据分析平台</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <script src="data.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; background: #f0f2f5; color: #333; }
+
+        /* 顶部导航 */
+        .navbar { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: #fff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .navbar h1 { font-size: 22px; font-weight: 600; letter-spacing: 1px; }
+        .navbar .stats { font-size: 14px; color: #8892b0; }
+        .navbar .stats span { color: #64ffda; font-weight: 600; margin: 0 2px; }
+
+        /* 统计卡片 */
+        .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 20px 32px; max-width: 1400px; margin: 0 auto; }
+        .summary-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); text-align: center; transition: transform 0.2s; }
+        .summary-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+        .summary-card .value { font-size: 28px; font-weight: 700; color: #1a1a2e; }
+        .summary-card .label { font-size: 13px; color: #8892b0; margin-top: 4px; }
+        .summary-card .value.price { color: #e74c3c; }
+        .summary-card .value.count { color: #2ecc71; }
+
+        /* 筛选栏 */
+        .filters { background: #fff; padding: 16px 32px; margin: 0 auto 16px; max-width: 1400px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+        .filters label { font-size: 14px; color: #666; font-weight: 500; }
+        .filters select, .filters input { padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+        .filters select:focus, .filters input:focus { border-color: #1a1a2e; }
+        .filters input[type="number"] { width: 90px; }
+        .filters .btn { padding: 8px 20px; background: #1a1a2e; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; transition: background 0.2s; }
+        .filters .btn:hover { background: #16213e; }
+        .filters .btn-reset { background: #8892b0; }
+        .filters .btn-reset:hover { background: #6b7394; }
+        .filter-result { font-size: 13px; color: #8892b0; margin-left: auto; }
+
+        /* 图表区域 */
+        .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 32px 16px; max-width: 1400px; margin: 0 auto; }
+        .chart-card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .chart-card h3 { font-size: 15px; color: #1a1a2e; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0; }
+        .chart-container { height: 300px; }
+
+        /* 数据表格 */
+        .table-section { padding: 16px 32px 32px; max-width: 1400px; margin: 0 auto; }
+        .table-card { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden; }
+        .table-card h3 { font-size: 15px; color: #1a1a2e; padding: 16px 20px; border-bottom: 1px solid #f0f0f0; }
+        .table-wrapper { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        thead { background: #f8f9fa; position: sticky; top: 0; }
+        th { padding: 12px 14px; text-align: left; font-weight: 600; color: #495057; white-space: nowrap; border-bottom: 2px solid #dee2e6; cursor: pointer; user-select: none; }
+        th:hover { color: #1a1a2e; }
+        th .sort-icon { font-size: 11px; margin-left: 4px; opacity: 0.4; }
+        th.active .sort-icon { opacity: 1; color: #e74c3c; }
+        td { padding: 12px 14px; border-bottom: 1px solid #f0f0f0; white-space: nowrap; }
+        tr:hover { background: #f8f9fa; }
+        .car-name { max-width: 300px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; color: #1a1a2e; }
+        .price { color: #e74c3c; font-weight: 600; }
+        .guide-price { color: #8892b0; font-size: 13px; }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-right: 4px; }
+        .tag-transfer { background: #fff3cd; color: #856404; }
+        .detail-link { color: #3498db; text-decoration: none; font-size: 13px; }
+        .detail-link:hover { text-decoration: underline; color: #2980b9; }
+
+        /* 分页 */
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; padding: 16px; }
+        .pagination button { padding: 6px 14px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font-size: 14px; }
+        .pagination button:hover { background: #f0f2f5; }
+        .pagination button.active { background: #1a1a2e; color: #fff; border-color: #1a1a2e; }
+        .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* 空状态 */
+        .empty { text-align: center; padding: 60px 20px; color: #adb5bd; }
+        .empty .icon { font-size: 48px; margin-bottom: 12px; }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .summary { grid-template-columns: repeat(2, 1fr); }
+            .charts { grid-template-columns: 1fr; }
+            .filters { flex-direction: column; align-items: flex-start; }
+            .filter-result { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="navbar">
+    <h1>懂车帝二手车数据分析平台</h1>
+    <div class="stats">共 <span id="totalCount">0</span> 辆车 | 数据来源：dongchedi.com</div>
+</div>
+
+<!-- 统计卡片 -->
+<div class="summary" id="summaryCards"></div>
+
+<!-- 筛选栏 -->
+<div class="filters">
+    <label>价格区间：</label>
+    <input type="number" id="priceMin" placeholder="最低(万)" step="0.1">
+    <span>-</span>
+    <input type="number" id="priceMax" placeholder="最高(万)" step="0.1">
+    <label>品牌：</label>
+    <select id="brandFilter"><option value="">全部品牌</option></select>
+    <label>年份：</label>
+    <select id="yearFilter"><option value="">全部年份</option></select>
+    <label>城市：</label>
+    <select id="cityFilter"><option value="">全部城市</option></select>
+    <button class="btn" onclick="applyFilters()">筛选</button>
+    <button class="btn btn-reset" onclick="resetFilters()">重置</button>
+    <span class="filter-result" id="filterResult"></span>
+</div>
+
+<!-- 图表 -->
+<div class="charts">
+    <div class="chart-card">
+        <h3>价格分布</h3>
+        <div class="chart-container" id="priceChart"></div>
+    </div>
+    <div class="chart-card">
+        <h3>品牌占比 TOP10</h3>
+        <div class="chart-container" id="brandChart"></div>
+    </div>
+    <div class="chart-card">
+        <h3>年份分布</h3>
+        <div class="chart-container" id="yearChart"></div>
+    </div>
+    <div class="chart-card">
+        <h3>价格 vs 里程</h3>
+        <div class="chart-container" id="scatterChart"></div>
+    </div>
+</div>
+
+<!-- 数据表格 -->
+<div class="table-section">
+    <div class="table-card">
+        <h3>二手车列表 <span style="font-weight:400;color:#8892b0;font-size:13px" id="tableInfo"></span></h3>
+        <div class="table-wrapper" style="max-height: 600px; overflow-y: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th onclick="sortBy('name')">车名 <span class="sort-icon">↕</span></th>
+                        <th onclick="sortBy('price_val')">二手价 <span class="sort-icon">↕</span></th>
+                        <th onclick="sortBy('guide_val')">指导价 <span class="sort-icon">↕</span></th>
+                        <th onclick="sortBy('year')">年份 <span class="sort-icon">↕</span></th>
+                        <th>里程</th>
+                        <th>城市</th>
+                        <th onclick="sortBy('transfer')">过户 <span class="sort-icon">↕</span></th>
+                        <th>详情</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+        <div class="pagination" id="pagination"></div>
+    </div>
+</div>
+
+<script>
+// ======================== 全局状态 ========================
+let filteredData = [];
+let currentPage = 1;
+const PAGE_SIZE = 20;
+let sortField = "price_val";
+let sortOrder = "asc";
+
+// ======================== 初始化 ========================
+function init() {
+    if (typeof CAR_DATA === "undefined" || !CAR_DATA.length) {
+        document.getElementById("tableBody").innerHTML = '<tr><td colspan="8" class="empty"><div class="icon">📭</div>暂无数据，请先运行 scraper.py</td></tr>';
+        return;
+    }
+
+    document.getElementById("totalCount").textContent = CAR_DATA.length;
+    filteredData = [...CAR_DATA];
+
+    initFilters();
+    renderSummary();
+    renderCharts();
+    renderTable();
+}
+
+// ======================== 统计卡片 ========================
+function renderSummary() {
+    const data = filteredData;
+    const prices = data.filter(d => d.price_val > 0).map(d => d.price_val);
+    const avgPrice = prices.length ? (prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2) : 0;
+    const minPrice = prices.length ? Math.min(...prices).toFixed(2) : 0;
+    const maxPrice = prices.length ? Math.max(...prices).toFixed(2) : 0;
+    const brands = new Set(data.map(d => d.brand)).size;
+
+    document.getElementById("summaryCards").innerHTML = `
+        <div class="summary-card"><div class="value count">${data.length}</div><div class="label">车辆总数</div></div>
+        <div class="summary-card"><div class="value price">${avgPrice}万</div><div class="label">平均价格</div></div>
+        <div class="summary-card"><div class="value price">${minPrice}万 ~ ${maxPrice}万</div><div class="label">价格区间</div></div>
+        <div class="summary-card"><div class="value count">${brands}</div><div class="label">品牌数量</div></div>
+    `;
+}
+
+// ======================== 筛选器 ========================
+function initFilters() {
+    const brands = [...new Set(CAR_DATA.map(d => d.brand))].filter(Boolean).sort();
+    const years = [...new Set(CAR_DATA.map(d => d.year))].filter(Boolean).sort((a, b) => b - a);
+    const cities = [...new Set(CAR_DATA.map(d => d.location))].filter(Boolean).sort();
+
+    const brandSelect = document.getElementById("brandFilter");
+    brands.forEach(b => { const o = document.createElement("option"); o.value = b; o.textContent = b; brandSelect.appendChild(o); });
+
+    const yearSelect = document.getElementById("yearFilter");
+    years.forEach(y => { const o = document.createElement("option"); o.value = y; o.textContent = y + "款"; yearSelect.appendChild(o); });
+
+    const citySelect = document.getElementById("cityFilter");
+    cities.forEach(c => { const o = document.createElement("option"); o.value = c; o.textContent = c; citySelect.appendChild(o); });
+}
+
+function applyFilters() {
+    const minP = parseFloat(document.getElementById("priceMin").value) || 0;
+    const maxP = parseFloat(document.getElementById("priceMax").value) || Infinity;
+    const brand = document.getElementById("brandFilter").value;
+    const year = document.getElementById("yearFilter").value;
+    const city = document.getElementById("cityFilter").value;
+
+    filteredData = CAR_DATA.filter(d => {
+        if (d.price_val < minP) return false;
+        if (d.price_val > maxP) return false;
+        if (brand && d.brand !== brand) return false;
+        if (year && String(d.year) !== year) return false;
+        if (city && d.location !== city) return false;
+        return true;
+    });
+
+    currentPage = 1;
+    document.getElementById("filterResult").textContent = `筛选结果: ${filteredData.length} 辆`;
+    renderSummary();
+    renderCharts();
+    renderTable();
+}
+
+function resetFilters() {
+    document.getElementById("priceMin").value = "";
+    document.getElementById("priceMax").value = "";
+    document.getElementById("brandFilter").value = "";
+    document.getElementById("yearFilter").value = "";
+    document.getElementById("cityFilter").value = "";
+    filteredData = [...CAR_DATA];
+    currentPage = 1;
+    document.getElementById("filterResult").textContent = "";
+    renderSummary();
+    renderCharts();
+    renderTable();
+}
+
+// ======================== 排序 ========================
+function sortBy(field) {
+    if (sortField === field) {
+        sortOrder = sortOrder === "asc" ? "desc" : "asc";
+    } else {
+        sortField = field;
+        sortOrder = "asc";
+    }
+    renderTable();
+}
+
+// ======================== 表格渲染 ========================
+function renderTable() {
+    const sorted = [...filteredData].sort((a, b) => {
+        let va = a[sortField], vb = b[sortField];
+        if (typeof va === "string") { va = va || ""; vb = vb || ""; }
+        else { va = va || 0; vb = vb || 0; }
+        return sortOrder === "asc" ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+    });
+
+    const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pageData = sorted.slice(start, start + PAGE_SIZE);
+
+    const tbody = document.getElementById("tableBody");
+    if (pageData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty"><div class="icon">📭</div>没有匹配的数据</td></tr>';
+    } else {
+        tbody.innerHTML = pageData.map(d => `
+            <tr>
+                <td class="car-name" title="${d.name}">${d.name}</td>
+                <td class="price">${d.price}</td>
+                <td class="guide-price">${d.guide_price}</td>
+                <td>${d.year || '-'}</td>
+                <td>${d.mileage || '-'}</td>
+                <td>${d.location || '-'}</td>
+                <td>${d.transfer !== undefined ? '<span class="tag tag-transfer">' + d.transfer + '次</span>' : '-'}</td>
+                <td><a class="detail-link" href="${d.detail_url}" target="_blank" rel="noopener">查看详情</a></td>
+            </tr>
+        `).join("");
+    }
+
+    document.getElementById("tableInfo").textContent = `(共 ${sorted.length} 辆，第 ${currentPage}/${totalPages || 1} 页)`;
+
+    // 分页
+    const pag = document.getElementById("pagination");
+    let pagHtml = `<button ${currentPage <= 1 ? "disabled" : ""} onclick="goPage(${currentPage - 1})">上一页</button>`;
+    const maxShow = 5;
+    let ps = Math.max(1, currentPage - Math.floor(maxShow / 2));
+    let pe = Math.min(totalPages, ps + maxShow - 1);
+    ps = Math.max(1, pe - maxShow + 1);
+    for (let i = ps; i <= pe; i++) {
+        pagHtml += `<button class="${i === currentPage ? "active" : ""}" onclick="goPage(${i})">${i}</button>`;
+    }
+    pagHtml += `<button ${currentPage >= totalPages ? "disabled" : ""} onclick="goPage(${currentPage + 1})">下一页</button>`;
+    pag.innerHTML = pagHtml;
+}
+
+function goPage(p) { currentPage = p; renderTable(); window.scrollTo({ top: document.querySelector(".table-section").offsetTop - 80, behavior: "smooth" }); }
+
+// ======================== 图表渲染 ========================
+function renderCharts() {
+    renderPriceChart();
+    renderBrandChart();
+    renderYearChart();
+    renderScatterChart();
+}
+
+function renderPriceChart() {
+    const chart = echarts.init(document.getElementById("priceChart"));
+    const prices = filteredData.filter(d => d.price_val > 0).map(d => d.price_val);
+    const bins = [0, 3, 5, 8, 10, 15, 20, 30, 50, 100, 200];
+    const labels = [];
+    const counts = [];
+    for (let i = 0; i < bins.length - 1; i++) {
+        labels.push(`${bins[i]}-${bins[i + 1]}万`);
+        counts.push(prices.filter(p => p >= bins[i] && p < bins[i + 1]).length);
+    }
+    chart.setOption({
+        tooltip: { trigger: "axis" },
+        grid: { top: 20, right: 20, bottom: 40, left: 50 },
+        xAxis: { type: "category", data: labels, axisLabel: { fontSize: 11, rotate: 20 } },
+        yAxis: { type: "value", name: "数量" },
+        series: [{
+            type: "bar", data: counts, barWidth: "60%",
+            itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: "#e74c3c" }, { offset: 1, color: "#c0392b" }]), borderRadius: [4, 4, 0, 0] }
+        }]
+    });
+    window.addEventListener("resize", () => chart.resize());
+}
+
+function renderBrandChart() {
+    const chart = echarts.init(document.getElementById("brandChart"));
+    const brandCount = {};
+    filteredData.forEach(d => { if (d.brand) brandCount[d.brand] = (brandCount[d.brand] || 0) + 1; });
+    const top10 = Object.entries(brandCount).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const colors = ["#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c", "#e67e22", "#34495e", "#16a085", "#d35400"];
+    chart.setOption({
+        tooltip: { trigger: "item", formatter: "{b}: {c}辆 ({d}%)" },
+        series: [{
+            type: "pie", radius: ["35%", "65%"], center: ["50%", "55%"],
+            data: top10.map((item, i) => ({ name: item[0], value: item[1], itemStyle: { color: colors[i % colors.length] } })),
+            label: { fontSize: 12, formatter: "{b}\n{d}%" }
+        }]
+    });
+    window.addEventListener("resize", () => chart.resize());
+}
+
+function renderYearChart() {
+    const chart = echarts.init(document.getElementById("yearChart"));
+    const yearCount = {};
+    filteredData.forEach(d => { if (d.year) yearCount[d.year] = (yearCount[d.year] || 0) + 1; });
+    const years = Object.keys(yearCount).sort();
+    chart.setOption({
+        tooltip: { trigger: "axis" },
+        grid: { top: 20, right: 20, bottom: 30, left: 50 },
+        xAxis: { type: "category", data: years },
+        yAxis: { type: "value", name: "数量" },
+        series: [{
+            type: "line", data: years.map(y => yearCount[y]), smooth: true,
+            areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: "rgba(52,152,219,0.3)" }, { offset: 1, color: "rgba(52,152,219,0.05)" }]) },
+            lineStyle: { color: "#3498db", width: 2 },
+            itemStyle: { color: "#3498db" }
+        }]
+    });
+    window.addEventListener("resize", () => chart.resize());
+}
+
+function renderScatterChart() {
+    const chart = echarts.init(document.getElementById("scatterChart"));
+    const data = filteredData.filter(d => d.price_val > 0 && d.mileage).map(d => {
+        const kmMatch = d.mileage.match(/([\d.]+)/);
+        const km = kmMatch ? parseFloat(kmMatch[1]) : 0;
+        return [km, d.price_val, d.brand + " " + (d.year || "") + "款"];
+    });
+    chart.setOption({
+        tooltip: { formatter: p => `${p.data[2]}<br/>里程: ${p.data[0]}万公里<br/>价格: ${p.data[1]}万` },
+        grid: { top: 20, right: 20, bottom: 40, left: 60 },
+        xAxis: { type: "value", name: "里程(万公里)", nameLocation: "center", nameGap: 25 },
+        yAxis: { type: "value", name: "价格(万)" },
+        series: [{
+            type: "scatter", data: data, symbolSize: 6,
+            itemStyle: { color: "rgba(231,76,60,0.6)" }
+        }]
+    });
+    window.addEventListener("resize", () => chart.resize());
+}
+
+// ======================== 启动 ========================
+window.onload = init;
+</script>
+</body>
+</html>
